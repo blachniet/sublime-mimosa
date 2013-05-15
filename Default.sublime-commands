@@ -1,0 +1,12 @@
+[{
+    "caption": "Mimosa::Watch & Serve (mimosa watch -s)",
+    "command": "mimosa_watch_and_serve"
+},
+{
+    "caption": "Mimosa::Clean",
+    "command": "mimosa_clean"  
+},
+{
+    "caption": "Mimosa::Kill Node",
+    "command": "mimosa_kill_node"
+}]
