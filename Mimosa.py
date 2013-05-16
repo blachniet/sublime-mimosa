@@ -59,6 +59,7 @@ class MimosaCommand(sublime_plugin.TextCommand):
         self.get_window().show_quick_panel(*args, **kwargs)
 
     def kill_node(self):
+        sublime.status_message('Killing node...')
         if os.name == 'nt':     # Kill Node on Windows
             command = """taskkill /f /im node.exe"""
         else:                   # Kill Node on Unix
@@ -97,26 +98,31 @@ class MimosaTextCommand(MimosaCommand, sublime_plugin.TextCommand):
     # So, this is not necessarily ideal, but it does work.
     return self.view.window() or sublime.active_window()
 
-class MimosaWatchAndServe(MimosaTextCommand):
+class MimosaWatch(MimosaTextCommand):
     def run(self, edit):
-        sublime.status_message('Killing node...')
+        self.kill_node()
+        self.proc_watch = subprocess.Popen(self.get_node_cmd('mimosa') + ' watch')
+
+class MimosaWatchS(MimosaTextCommand):
+    def run(self, edit):
         self.kill_node()
         self.proc_watch = subprocess.Popen(self.get_node_cmd('mimosa') + ' watch -s')
 
-class MimosaBuild(MimosaTextCommand):
+class MimosaBuildOm(MimosaTextCommand):
+    def run(self, edit):
+        self.run_command(['mimosa', 'build', '-om'])
+
+class MimosaBuildOmp(MimosaTextCommand):
     def run(self, edit):
         self.run_command(['mimosa', 'build', '-omp'])
 
 class MimosaClean(MimosaTextCommand):
-
     def run(self, edit):
-        sublime.status_message('Killing node...')
         self.kill_node()
         self.run_command(['mimosa', 'clean'])
 
-class MimosaKillNode(MimosaTextCommand):
+class MimosaCleanF(MimosaTextCommand):
     def run(self, edit):
-        sublime.status_message('Killing node...')
         self.kill_node()
-        sublime.status_message('')
+        self.run_command(['mimosa', 'clean', '-f'])
 

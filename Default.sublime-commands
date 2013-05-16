@@ -1,14 +1,26 @@
 [{
-    "caption": "Mimosa::Watch & Serve (mimosa watch -s)",
-    "command": "mimosa_watch_and_serve"
+    "caption": "Mimosa::Watch",
+    "command": "mimosa_watch"
 },
 {
-    "caption": "Mimosa::Build (mimosa build -omp)",
-    "command": "mimosa_build"
+    "caption": "Mimosa::Watch -s",
+    "command": "mimosa_watch_s"
 },
 {
-    "caption": "Mimosa::Clean (mimosa clean)",
+    "caption": "Mimosa::Build -mo",
+    "command": "mimosa_build_om"
+},
+{
+    "caption": "Mimosa::Build -mop",
+    "command": "mimosa_build_omp"
+},
+{
+    "caption": "Mimosa::Clean",
     "command": "mimosa_clean"  
+},
+{
+    "caption": "Mimosa::Clean -f",
+    "command": "mimosa_clean_f"  
 },
 {
     "caption": "Mimosa::Kill Node",
