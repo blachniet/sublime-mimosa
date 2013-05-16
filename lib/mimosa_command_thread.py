@@ -20,11 +20,12 @@ def _make_text_safeish(text, fallback_encoding):
     unitext = text.decode(fallback_encoding)
   return unitext
 
-class CommandThread(threading.Thread):
-  def __init__(self, command, on_done, working_dir="", fallback_encoding=""):
+class MimosaCommandThread(threading.Thread):
+  def __init__(self, command, on_done, on_progress, working_dir="", fallback_encoding=""):
     threading.Thread.__init__(self)
     self.command = command
     self.on_done = on_done
+    self.on_progress = on_progress
     self.working_dir = working_dir
     self.fallback_encoding = fallback_encoding
 
@@ -38,10 +39,19 @@ class CommandThread(threading.Thread):
       proc = subprocess.Popen(self.command,
         stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
         shell=shell, universal_newlines=True)
-      output = proc.communicate()[0]
+
+      if self.on_progress != None:
+        while proc.poll() is None:
+          line = proc.stdout.readline()
+          print "--> " + line.rstrip('\n')
+          main_thread(self.on_progress, _make_text_safeish(line, self.fallback_encoding))
+        main_thread(self.on_done, '')
+      else:
+        output = proc.communicate()[0]
+        main_thread(self.on_done, _make_text_safeish(output, self.fallback_encoding))
       # if sublime's python gets bumped to 2.7 we can just do:
       # output = subprocess.check_output(self.command)
-      main_thread(self.on_done, _make_text_safeish(output, self.fallback_encoding))
+      # main_thread(self.on_done, _make_text_safeish(output, self.fallback_encoding))
     except subprocess.CalledProcessError, e:
       main_thread(self.on_done, e.returncode)
     except OSError, e:

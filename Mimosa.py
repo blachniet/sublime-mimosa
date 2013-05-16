@@ -3,21 +3,76 @@ import subprocess
 import sublime
 import sublime_plugin
 import time
-
-from lib.command_thread import CommandThread
+import functools
+import threading
 
 def open_url(url):
   sublime.active_window().run_command('open_url', {"url": url})
 
+def main_thread(callback, *args, **kwargs):
+  # sublime.set_timeout gets used to send things onto the main thread
+  # most sublime.[something] calls need to be on the main thread
+  sublime.set_timeout(functools.partial(callback, *args, **kwargs), 0)
+
+def _make_text_safeish(text, fallback_encoding):
+  # The unicode decode here is because sublime converts to unicode inside
+  # insert in such a way that unknown characters will cause errors, which is
+  # distinctly non-ideal... and there's no way to tell what's coming out of
+  # git in output. So...
+  try:
+    unitext = text.decode('utf-8')
+  except UnicodeDecodeError:
+    unitext = text.decode(fallback_encoding)
+  return unitext
+
+class MimosaCommandThread(threading.Thread):
+  def __init__(self, command, on_done, on_progress, working_dir="", fallback_encoding=""):
+    threading.Thread.__init__(self)
+    self.command = command
+    self.on_done = on_done
+    self.on_progress = on_progress
+    self.working_dir = working_dir
+    self.fallback_encoding = fallback_encoding
+
+  def run(self):
+    try:
+      # Per http://bugs.python.org/issue8557 shell=True is required to
+      # get $PATH on Windows. Yay portable code.
+      shell = os.name == 'nt'
+      if self.working_dir != "":
+        os.chdir(self.working_dir)
+      proc = subprocess.Popen(self.command,
+        stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+        shell=shell, universal_newlines=True)
+
+      if self.on_progress != None:
+        while proc.poll() is None:
+          line = proc.stdout.readline()
+          main_thread(self.on_progress, _make_text_safeish(line, self.fallback_encoding))
+        main_thread(self.on_done, '')
+      else:
+        output = proc.communicate()[0]
+        main_thread(self.on_done, _make_text_safeish(output, self.fallback_encoding))
+      # if sublime's python gets bumped to 2.7 we can just do:
+      # output = subprocess.check_output(self.command)
+      # main_thread(self.on_done, _make_text_safeish(output, self.fallback_encoding))
+    except subprocess.CalledProcessError, e:
+      main_thread(self.on_done, e.returncode)
+    except OSError, e:
+      if e.errno == 2:
+        main_thread(sublime.error_message, "Node binary could not be found in PATH\n\nConsider using the node_command setting for the Node plugin\n\nPATH is: %s" % os.environ['PATH'])
+      else:
+        raise e
+
 class MimosaCommand(sublime_plugin.TextCommand):
-    def run_command(self, command, callback=None, show_status=True, filter_empty_args=True, **kwargs):
+    def run_command(self, command, callback=None, progress_callback=None, show_status=True, filter_empty_args=True, **kwargs):
 
         if 'working_dir' not in kwargs:
             kwargs['working_dir'] = self.get_working_dir()
         if not callback:
             callback = self.generic_done
 
-        thread = CommandThread(command, callback, **kwargs)
+        thread = MimosaCommandThread(command, callback, progress_callback, **kwargs)
         thread.start()
 
         if show_status:
@@ -104,9 +159,31 @@ class MimosaWatch(MimosaTextCommand):
         self.proc_watch = subprocess.Popen(self.get_node_cmd('mimosa') + ' watch')
 
 class MimosaWatchS(MimosaTextCommand):
+
+    # def _output_to_view(self, output_file, output, clear=False, syntax="Packages/JavaScript/JavaScript.tmLanguage"):
+    #     output_file.set_syntax_file(syntax)
+    #     edit = output_file.begin_edit()
+    #     if clear:
+    #         region = sublime.Region(0, self.output_view.size())
+    #         output_file.erase(edit, region)
+    #     output_file.insert(edit, 0, output)
+    #     output_file.end_edit(edit)
+
+    def on_progress(self, out):
+        self.watch_output_view.set_read_only(False)
+
+        edit = self.watch_output_view.begin_edit()
+        self.watch_output_view.insert(edit, self.watch_output_view.size(), out.replace('[32m[1m',''))
+        self.watch_output_view.end_edit(edit)
+        
+        self.watch_output_view.set_read_only(True)
+
     def run(self, edit):
         self.kill_node()
-        self.proc_watch = subprocess.Popen(self.get_node_cmd('mimosa') + ' watch -s')
+        self.watch_output_view = self.get_window().new_file()
+        self.watch_output_view.set_name("Mimosa Output")
+        self.watch_output_view.set_scratch(True)
+        self.run_command(['mimosa', 'watch', '-s'], progress_callback=self.on_progress)
 
 class MimosaBuildOm(MimosaTextCommand):
     def run(self, edit):
@@ -117,9 +194,12 @@ class MimosaBuildOmp(MimosaTextCommand):
         self.run_command(['mimosa', 'build', '-omp'])
 
 class MimosaClean(MimosaTextCommand):
+    def on_progress(self, out):
+        print "==> " + out.rstrip('\n')
+
     def run(self, edit):
         self.kill_node()
-        self.run_command(['mimosa', 'clean'])
+        self.run_command(['mimosa', 'clean'], progress_callback=self.on_progress)
 
 class MimosaCleanF(MimosaTextCommand):
     def run(self, edit):
