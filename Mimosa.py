@@ -3,11 +3,77 @@ import subprocess
 import sublime
 import sublime_plugin
 import time
-
-from lib.command_thread import CommandThread
+import functools
+import threading
 
 def open_url(url):
   sublime.active_window().run_command('open_url', {"url": url})
+
+class MimosaCommandThread(threading.Thread):
+  """Supports executing shell commands on a separate thread.
+  This class supports the ability to listen to the command output as it is executing
+  or only get the output after the entire command has completed.
+
+  """
+  def __init__(self, command, callback, callback_on_complete=True, working_dir="", fallback_encoding=""):
+    """Initializes a new instance fo the MimosaCommandThread.
+
+    :param command:               An array of strings representing the parts of the command to execute.
+    :param callback:              A function to be executed either after the command has completed or as we get each line of output from the command.
+    :param callback_on_complete:  Indicates whether the callback should be invoked when the entier command is complete or as we get each line of output. (default True)
+    :param working_dir:
+    :param fallback_encoding:
+
+    """
+    threading.Thread.__init__(self)
+    self.command = command
+    self.callback = callback
+    self.callback_on_complete = callback_on_complete
+    self.working_dir = working_dir
+    self.fallback_encoding = fallback_encoding
+
+  def run(self):
+    try:
+      # Per http://bugs.python.org/issue8557 shell=True is required to
+      # get $PATH on Windows. Yay portable code.
+      shell = os.name == 'nt'
+      if self.working_dir != "":
+        os.chdir(self.working_dir)
+      proc = subprocess.Popen(self.command,
+        stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+        shell=shell, universal_newlines=True)
+
+      if self.callback_on_complete:   # The callback should not be invoked until the command has completed.
+        output = proc.communicate()[0]
+        self.main_thread(self.callback, self._make_text_safeish(output, self.fallback_encoding))
+      else:
+        while proc.poll() is None:    # Invoke the callback with every new line of output.
+          line = proc.stdout.readline()
+          main_thread(self.callback, self._make_text_safeish(line, self.fallback_encoding))
+
+    except subprocess.CalledProcessError, e:
+      self.main_thread(self.callback, e.returncode)
+    except OSError, e:
+      if e.errno == 2:
+        self.main_thread(sublime.error_message, "Node binary could not be found in PATH\n\nConsider using the node_command setting for the Node plugin\n\nPATH is: %s" % os.environ['PATH'])
+      else:
+        raise e
+
+  def main_thread(self, callback, *args, **kwargs):
+    # sublime.set_timeout gets used to send things onto the main thread
+    # most sublime.[something] calls need to be on the main thread
+    sublime.set_timeout(functools.partial(callback, *args, **kwargs), 0)
+
+  def _make_text_safeish(self, text, fallback_encoding):
+    # The unicode decode here is because sublime converts to unicode inside
+    # insert in such a way that unknown characters will cause errors, which is
+    # distinctly non-ideal... and there's no way to tell what's coming out of
+    # git in output. So...
+    try:
+      unitext = text.decode('utf-8')
+    except UnicodeDecodeError:
+      unitext = text.decode(fallback_encoding)
+    return unitext
 
 class MimosaCommand(sublime_plugin.TextCommand):
     def run_command(self, command, callback=None, show_status=True, filter_empty_args=True, **kwargs):
@@ -17,7 +83,7 @@ class MimosaCommand(sublime_plugin.TextCommand):
         if not callback:
             callback = self.generic_done
 
-        thread = CommandThread(command, callback, **kwargs)
+        thread = MimosaCommandThread(command, callback, **kwargs)
         thread.start()
 
         if show_status:
@@ -66,11 +132,6 @@ class MimosaCommand(sublime_plugin.TextCommand):
             command = """kill -9 `ps -ef | grep node | grep -v grep | awk '{print $2}'`"""
         os.system(command)
 
-    def get_node_cmd(self, command):
-        if os.name == 'nt':     # Windows commands are *.cmd files
-            return command + '.cmd'
-        return command
-
 class MimosaTextCommand(MimosaCommand, sublime_plugin.TextCommand):
   def active_view(self):
     return self.view
@@ -101,12 +162,12 @@ class MimosaTextCommand(MimosaCommand, sublime_plugin.TextCommand):
 class MimosaWatch(MimosaTextCommand):
     def run(self, edit):
         self.kill_node()
-        self.proc_watch = subprocess.Popen(self.get_node_cmd('mimosa') + ' watch')
+        self.run_command(['mimosa', 'watch'])
 
 class MimosaWatchS(MimosaTextCommand):
     def run(self, edit):
         self.kill_node()
-        self.proc_watch = subprocess.Popen(self.get_node_cmd('mimosa') + ' watch -s')
+        self.run_command(['mimosa', 'watch', '-s'])
 
 class MimosaBuildOm(MimosaTextCommand):
     def run(self, edit):
