@@ -49,7 +49,7 @@ class MimosaCommandThread(threading.Thread):
       else:
         while proc.poll() is None:    # Invoke the callback with every new line of output.
           line = proc.stdout.readline()
-          main_thread(self.callback, self._make_text_safeish(line, self.fallback_encoding))
+          self.main_thread(self.callback, self._make_text_safeish(line, self.fallback_encoding))
 
     except subprocess.CalledProcessError, e:
       self.main_thread(self.callback, e.returncode)
@@ -76,14 +76,14 @@ class MimosaCommandThread(threading.Thread):
     return unitext
 
 class MimosaCommand(sublime_plugin.TextCommand):
-    def run_command(self, command, callback=None, show_status=True, filter_empty_args=True, **kwargs):
+    def run_command(self, command, callback=None, callback_on_complete=True, show_status=True, filter_empty_args=True, **kwargs):
 
         if 'working_dir' not in kwargs:
             kwargs['working_dir'] = self.get_working_dir()
         if not callback:
             callback = self.generic_done
 
-        thread = MimosaCommandThread(command, callback, **kwargs)
+        thread = MimosaCommandThread(command, callback, callback_on_complete, **kwargs)
         thread.start()
 
         if show_status:
@@ -160,14 +160,41 @@ class MimosaTextCommand(MimosaCommand, sublime_plugin.TextCommand):
     return self.view.window() or sublime.active_window()
 
 class MimosaWatch(MimosaTextCommand):
-    def run(self, edit):
-        self.kill_node()
-        self.run_command(['mimosa', 'watch'])
 
-class MimosaWatchS(MimosaTextCommand):
+    def prep_output_view(self):
+      v = self.get_window().new_file()
+      v.set_name("Mimosa Watch")
+      v.set_scratch(True)
+      self.output_view = v
+
+    def append_line(self, output=''):
+
+      v = self.output_view
+      v.set_read_only(False)
+      edit = v.begin_edit()
+      v.insert(edit, v.size(), output + '\n')
+      v.end_edit(edit)
+      v.set_read_only(True)
+
+    def on_update(self, output):
+      output = output.replace('[32m[1m', '').replace('[0m', '').rstrip()
+      if len(output) > 0:
+        self.append_line('  ' + output)
+
     def run(self, edit):
+        self.prep_output_view()
+        self.append_line("Killing node...")
         self.kill_node()
-        self.run_command(['mimosa', 'watch', '-s'])
+        self.append_line("mimosa watch")
+        self.run_command(['mimosa', 'watch'], callback=self.on_update, callback_on_complete=False)
+
+class MimosaWatchS(MimosaWatch):
+    def run(self, edit):
+        self.prep_output_view()
+        self.append_line("Killing node...")
+        self.kill_node()
+        self.append_line("mimosa watch -s")
+        self.run_command(['mimosa', 'watch', '-s'], callback=self.on_update, callback_on_complete=False)
 
 class MimosaBuildOm(MimosaTextCommand):
     def run(self, edit):
