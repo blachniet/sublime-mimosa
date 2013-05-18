@@ -9,6 +9,9 @@ import re
 
 class MimosaUtil:
     color_code_regex = re.compile('\x1b\[\d+m')
+    fatal_message_regex = re.compile('^\s*\d\d:\d\d:\d\d\s+-\s+FATAL:')
+    jslinterror_message_regex = re.compile('^\s*\d\d:\d\d:\d\d\s+-\s+JavaScript Lint Error:')
+    csslintwarn_message_regex = re.compile('^\s*\d\d:\d\d:\d\d\s+-\s+CSSLint Warning:')
 
     @staticmethod
     def kill_node_now():
@@ -240,21 +243,38 @@ Build
 
 class MimosaBuild(MimosaTextCommand):
     def on_complete(self, output):
+        self.append_line("==========")
         self.append_line("Build complete")
+        self.append_line("  FATAL Errors    : " +  str(self.fatal_message_count))
+        self.append_line("  JSLint Errors   : " +  str(self.jslinterror_message_count))
+        self.append_line("  CSSLint Warnings: " +  str(self.csslintwarn_message_count))
 
     def on_progress(self, output):
-      output = MimosaUtil.cleanup_line(output)
-      if len(output) > 0:
-        self.append_line('  ' + output)
+        output = MimosaUtil.cleanup_line(output)
+        if MimosaUtil.fatal_message_regex.search(output) != None:
+            self.fatal_message_count += 1
+        elif MimosaUtil.jslinterror_message_regex.search(output) != None:
+            self.jslinterror_message_count += 1
+        elif MimosaUtil.csslintwarn_message_regex.search(output) != None:
+            self.csslintwarn_message_count += 1
+
+        if len(output) > 0:
+            self.append_line('  ' + output)
 
     def run(self, edit):
+        self.fatal_message_count = 0
+        self.jslinterror_message_count = 0
+        self.csslintwarn_message_count = 0
+
         self.prep_scratch_output_view('Mimosa Build')
+        self.append_line('Starting Mimosa Build. This may take a moment...')
         self.append_line('mimosa build')
         self.run_command(['mimosa', 'build'], self.on_complete, self.on_progress)
 
 class MimosaBuildOm(MimosaBuild):
     def run(self, edit):
         self.prep_scratch_output_view('Mimosa Build')
+        self.append_line('Starting Mimosa Build. This may take a moment...')
         self.append_line('mimosa build -om')
         self.run_command(['mimosa', 'build', '-om'], self.on_complete, self.on_progress)
 
