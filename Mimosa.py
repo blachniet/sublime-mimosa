@@ -164,6 +164,7 @@ class MimosaCommand(sublime_plugin.TextCommand):
         v.set_read_only(True)
 
     def kill_node(self, on_complete=None, on_progress=None):
+        self.append_line("Killing node...")
         if os.name == 'nt':     # Kill Node on Windows
             command = 'taskkill /f /im node.exe'
         else:                   # Kill Node on Unix
@@ -220,7 +221,6 @@ class MimosaWatch(MimosaTextCommand):
 
     def run(self, edit):
         self.prep_scratch_output_view('Mimosa Watch')
-        self.append_line("Killing node...")
         self.kill_node(self.on_kill_node_complete, self.on_progress)
 
 class MimosaWatchS(MimosaWatch):
@@ -232,7 +232,6 @@ class MimosaWatchS(MimosaWatch):
 
     def run(self, edit):
         self.prep_scratch_output_view('Mimosa Watch')
-        self.append_line("Killing node...")
         self.kill_node(self.on_kill_node_complete, self.on_progress)
 
 """ 
@@ -269,14 +268,30 @@ class MimosaBuildOmp(MimosaBuild):
 Clean 
 """
 class MimosaClean(MimosaTextCommand):
-    def run(self, edit):
-        MimosaUtil.kill_node_now()
-        self.run_command(['mimosa', 'clean'])
+    def on_complete(self, output):
+        self.append_line("Clean complete")
 
-class MimosaCleanF(MimosaTextCommand):
+    def on_progress(self, output):
+      output = MimosaUtil.cleanup_line(output)
+      if len(output) > 0:
+        self.append_line('  ' + output)
+
+    def on_kill_node_complete(self, output):
+        self.append_line('mimosa clean')
+        self.run_command(['mimosa', 'clean'], self.on_complete, self.on_progress)
+
     def run(self, edit):
-        MimosaUtil.kill_node_now()
-        self.run_command(['mimosa', 'clean', '-f'])
+        self.prep_scratch_output_view('Mimosa Clean')
+        self.kill_node(self.on_kill_node_complete, self.on_progress)
+
+class MimosaCleanF(MimosaClean):
+    def on_kill_node_complete(self, output):
+        self.append_line('mimosa clean -f')
+        self.run_command(['mimosa', 'clean', '-f'], self.on_complete, self.on_progress)
+
+    def run(self, edit):
+        self.prep_scratch_output_view('Mimosa Clean')
+        self.kill_node(self.on_kill_node_complete, self.on_progress)
 
 """ 
 Other
