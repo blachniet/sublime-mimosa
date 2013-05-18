@@ -124,13 +124,20 @@ class MimosaCommand(sublime_plugin.TextCommand):
     def quick_panel(self, *args, **kwargs):
         self.get_window().show_quick_panel(*args, **kwargs)
 
-    def kill_node(self):
+    def kill_node_now(self):
         sublime.status_message('Killing node...')
         if os.name == 'nt':     # Kill Node on Windows
             command = """taskkill /f /im node.exe"""
         else:                   # Kill Node on Unix
             command = """kill -9 `ps -ef | grep node | grep -v grep | awk '{print $2}'`"""
         os.system(command)
+
+    def kill_node(self, on_complete=None, on_progress=None):
+        if os.name == 'nt':     # Kill Node on Windows
+            command = ['taskkill', '/f', '/im', 'node.exe']
+        else:                   # Kill Node on Unix
+            command = """kill -9 `ps -ef | grep node | grep -v grep | awk '{print $2}'`"""
+        self.run_command(command, on_complete, on_progress)
 
 class MimosaTextCommand(MimosaCommand, sublime_plugin.TextCommand):
   def active_view(self):
@@ -182,22 +189,27 @@ class MimosaWatch(MimosaTextCommand):
         self.append_line('  ' + output)
 
     def on_complete(self, output):
-        append_line("mimosa watch stopped")
+        self.append_line("mimosa watch stopped")
 
-    def run(self, edit):
-        self.prep_output_view()
-        self.append_line("Killing node...")
-        self.kill_node()
+    def on_kill_node_complete(self, output):
         self.append_line("mimosa watch")
         self.run_command(['mimosa', 'watch'], on_complete=self.on_complete, on_progress=self.on_progress)
 
-class MimosaWatchS(MimosaWatch):
     def run(self, edit):
         self.prep_output_view()
         self.append_line("Killing node...")
-        self.kill_node()
+        self.kill_node(self.on_kill_node_complete, self.on_progress)
+
+class MimosaWatchS(MimosaWatch):
+    def on_kill_node_complete(self, output):
         self.append_line("mimosa watch -s")
         self.run_command(['mimosa', 'watch', '-s'], on_complete=self.on_complete, on_progress=self.on_progress)
+
+    def run(self, edit):
+        self.prep_output_view()
+        self.append_line("Killing node...")
+        self.kill_node(self.on_kill_node_complete, self.on_progress)
+        
 
 class MimosaBuildOm(MimosaTextCommand):
     def run(self, edit):
@@ -209,11 +221,11 @@ class MimosaBuildOmp(MimosaTextCommand):
 
 class MimosaClean(MimosaTextCommand):
     def run(self, edit):
-        self.kill_node()
+        self.kill_node_now()
         self.run_command(['mimosa', 'clean'])
 
 class MimosaCleanF(MimosaTextCommand):
     def run(self, edit):
-        self.kill_node()
+        self.kill_node_now()
         self.run_command(['mimosa', 'clean', '-f'])
 
