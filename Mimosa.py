@@ -15,20 +15,20 @@ class MimosaCommandThread(threading.Thread):
   or only get the output after the entire command has completed.
 
   """
-  def __init__(self, command, callback, callback_on_complete=True, working_dir="", fallback_encoding=""):
+  def __init__(self, command, on_complete, on_progress=None, working_dir="", fallback_encoding=""):
     """Initializes a new instance fo the MimosaCommandThread.
 
-    :param command:               An array of strings representing the parts of the command to execute.
-    :param callback:              A function to be executed either after the command has completed or as we get each line of output from the command.
-    :param callback_on_complete:  Indicates whether the callback should be invoked when the entier command is complete or as we get each line of output. (default True)
+    :param command:                 An array of strings representing the parts of the command to execute.
+    :param on_complete:             A function to be executed either after the command has completed.
+    :param on_progress:             A function to be executed every time a new line of output from the command is available. (Default is None)
     :param working_dir:
     :param fallback_encoding:
 
     """
     threading.Thread.__init__(self)
     self.command = command
-    self.callback = callback
-    self.callback_on_complete = callback_on_complete
+    self.on_complete = on_complete
+    self.on_progress = on_progress
     self.working_dir = working_dir
     self.fallback_encoding = fallback_encoding
 
@@ -43,16 +43,16 @@ class MimosaCommandThread(threading.Thread):
         stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
         shell=shell, universal_newlines=True)
 
-      if self.callback_on_complete:   # The callback should not be invoked until the command has completed.
-        output = proc.communicate()[0]
-        self.main_thread(self.callback, self._make_text_safeish(output, self.fallback_encoding))
-      else:
-        while proc.poll() is None:    # Invoke the callback with every new line of output.
+      if self.on_progress != None:
+        while proc.poll() is None:    # Invoke on_progress with every new line of output.
           line = proc.stdout.readline()
-          self.main_thread(self.callback, self._make_text_safeish(line, self.fallback_encoding))
+          self.main_thread(self.on_progress, self._make_text_safeish(line, self.fallback_encoding))
+        
+      output = proc.communicate()[0]
+      self.main_thread(self.on_complete, self._make_text_safeish(output, self.fallback_encoding))
 
     except subprocess.CalledProcessError, e:
-      self.main_thread(self.callback, e.returncode)
+      self.main_thread(self.on_complete, e.returncode)
     except OSError, e:
       if e.errno == 2:
         self.main_thread(sublime.error_message, "Node binary could not be found in PATH\n\nConsider using the node_command setting for the Node plugin\n\nPATH is: %s" % os.environ['PATH'])
@@ -76,14 +76,14 @@ class MimosaCommandThread(threading.Thread):
     return unitext
 
 class MimosaCommand(sublime_plugin.TextCommand):
-    def run_command(self, command, callback=None, callback_on_complete=True, show_status=True, filter_empty_args=True, **kwargs):
+    def run_command(self, command, on_complete=None, on_progress=None, show_status=True, filter_empty_args=True, **kwargs):
 
         if 'working_dir' not in kwargs:
             kwargs['working_dir'] = self.get_working_dir()
-        if not callback:
-            callback = self.generic_done
+        if not on_complete:
+            on_complete = self.generic_done
 
-        thread = MimosaCommandThread(command, callback, callback_on_complete, **kwargs)
+        thread = MimosaCommandThread(command, on_complete, on_progress, **kwargs)
         thread.start()
 
         if show_status:
@@ -176,17 +176,20 @@ class MimosaWatch(MimosaTextCommand):
       v.end_edit(edit)
       v.set_read_only(True)
 
-    def on_update(self, output):
+    def on_progress(self, output):
       output = output.replace('[32m[1m', '').replace('[0m', '').rstrip()
       if len(output) > 0:
         self.append_line('  ' + output)
+
+    def on_complete(self, output):
+        append_line("mimosa watch stopped")
 
     def run(self, edit):
         self.prep_output_view()
         self.append_line("Killing node...")
         self.kill_node()
         self.append_line("mimosa watch")
-        self.run_command(['mimosa', 'watch'], callback=self.on_update, callback_on_complete=False)
+        self.run_command(['mimosa', 'watch'], on_complete=self.on_complete, on_progress=self.on_progress)
 
 class MimosaWatchS(MimosaWatch):
     def run(self, edit):
@@ -194,7 +197,7 @@ class MimosaWatchS(MimosaWatch):
         self.append_line("Killing node...")
         self.kill_node()
         self.append_line("mimosa watch -s")
-        self.run_command(['mimosa', 'watch', '-s'], callback=self.on_update, callback_on_complete=False)
+        self.run_command(['mimosa', 'watch', '-s'], on_complete=self.on_complete, on_progress=self.on_progress)
 
 class MimosaBuildOm(MimosaTextCommand):
     def run(self, edit):
