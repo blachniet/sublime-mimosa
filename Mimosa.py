@@ -148,10 +148,21 @@ class MimosaCommand(sublime_plugin.TextCommand):
     def prep_scratch_output_view(self, name="Mimosa Output"):
         """Sets this command's output view to a new scratch window
         """
-        v = self.get_window().new_file()
-        v.set_name(name)
-        v.set_scratch(True)
-        self.output_view = v
+        found_view = False
+        for v in self.get_window().views():
+            if v.name() == name:
+                self.output_view = v
+                self.get_window().focus_view(self.output_view)
+                found_view = True
+
+        if not found_view:
+            v = self.get_window().new_file()
+            v.set_name(name)
+            v.set_scratch(True)
+            self.output_view = v
+
+    def print_final_output(self):
+        self.append_line("########################################")
 
     def quick_panel(self, *args, **kwargs):
         self.get_window().show_quick_panel(*args, **kwargs)
@@ -247,11 +258,12 @@ Build
 
 class MimosaBuild(MimosaTextCommand):
     def on_complete(self, output):
-        self.append_line("==========")
+        self.append_line("====================")
         self.append_line("Build complete")
         self.append_line("  FATAL Errors    : " +  str(self.fatal_message_count))
         self.append_line("  JSLint Errors   : " +  str(self.jslinterror_message_count))
         self.append_line("  CSSLint Warnings: " +  str(self.csslintwarn_message_count))
+        self.print_final_output()
 
     def on_progress(self, output):
         output = MimosaUtil.cleanup_line(output)
@@ -270,21 +282,22 @@ class MimosaBuild(MimosaTextCommand):
         self.jslinterror_message_count = 0
         self.csslintwarn_message_count = 0
 
-        self.prep_scratch_output_view('Mimosa Build')
+        self.prep_scratch_output_view()
         self.append_line('Starting Mimosa Build. This may take a moment...')
         self.append_line('mimosa build')
         self.run_command(['mimosa', 'build'], self.on_complete, self.on_progress)
 
 class MimosaBuildOm(MimosaBuild):
     def run(self, edit):
-        self.prep_scratch_output_view('Mimosa Build')
+        self.prep_scratch_output_view()
         self.append_line('Starting Mimosa Build. This may take a moment...')
         self.append_line('mimosa build -om')
         self.run_command(['mimosa', 'build', '-om'], self.on_complete, self.on_progress)
 
 class MimosaBuildOmp(MimosaBuild):
     def run(self, edit):
-        self.prep_scratch_output_view('Mimosa Build')
+        self.prep_scratch_output_view()
+        self.append_line('Starting Mimosa Build. This may take a moment...')
         self.append_line('mimosa build -omp')
         self.run_command(['mimosa', 'build', '-omp'], self.on_complete, self.on_progress)
 
@@ -294,6 +307,7 @@ Clean
 class MimosaClean(MimosaTextCommand):
     def on_complete(self, output):
         self.append_line("Clean complete")
+        self.print_final_output()
 
     def on_progress(self, output):
       output = MimosaUtil.cleanup_line(output)
@@ -301,11 +315,12 @@ class MimosaClean(MimosaTextCommand):
         self.append_line('  ' + output)
 
     def on_kill_node_complete(self, output):
+        self.append_line('Starting Mimosa Clean. This may take a moment...')
         self.append_line('mimosa clean')
         self.run_command(['mimosa', 'clean'], self.on_complete, self.on_progress)
 
     def run(self, edit):
-        self.prep_scratch_output_view('Mimosa Clean')
+        self.prep_scratch_output_view()
         self.kill_node(self.on_kill_node_complete)
 
 class MimosaCleanF(MimosaClean):
@@ -314,7 +329,7 @@ class MimosaCleanF(MimosaClean):
         self.run_command(['mimosa', 'clean', '-f'], self.on_complete, self.on_progress)
 
     def run(self, edit):
-        self.prep_scratch_output_view('Mimosa Clean')
+        self.prep_scratch_output_view()
         self.kill_node(self.on_kill_node_complete)
 
 """ 
