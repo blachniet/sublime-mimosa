@@ -130,13 +130,15 @@ class MimosaCommand(sublime_plugin.TextCommand):
             command = """taskkill /f /im node.exe"""
         else:                   # Kill Node on Unix
             command = """kill -9 `ps -ef | grep node | grep -v grep | awk '{print $2}'`"""
+        sublime.status_message(command)
         os.system(command)
 
     def kill_node(self, on_complete=None, on_progress=None):
         if os.name == 'nt':     # Kill Node on Windows
-            command = ['taskkill', '/f', '/im', 'node.exe']
+            command = 'taskkill /f /im node.exe'
         else:                   # Kill Node on Unix
             command = """kill -9 `ps -ef | grep node | grep -v grep | awk '{print $2}'`"""
+        sublime.status_message(command)
         self.run_command(command, on_complete, on_progress)
 
 class MimosaTextCommand(MimosaCommand, sublime_plugin.TextCommand):
@@ -192,6 +194,8 @@ class MimosaWatch(MimosaTextCommand):
         self.append_line("mimosa watch stopped")
 
     def on_kill_node_complete(self, output):
+        self.append_line()
+        self.append_line('Starting mimosa watch. Use Mimosa::KillNode to stop.')
         self.append_line("mimosa watch")
         self.run_command(['mimosa', 'watch'], on_complete=self.on_complete, on_progress=self.on_progress)
 
@@ -202,6 +206,8 @@ class MimosaWatch(MimosaTextCommand):
 
 class MimosaWatchS(MimosaWatch):
     def on_kill_node_complete(self, output):
+        self.append_line()
+        self.append_line('Starting mimosa watch. Use Mimosa::KillNode to stop.')
         self.append_line("mimosa watch -s")
         self.run_command(['mimosa', 'watch', '-s'], on_complete=self.on_complete, on_progress=self.on_progress)
 
@@ -209,7 +215,6 @@ class MimosaWatchS(MimosaWatch):
         self.prep_output_view()
         self.append_line("Killing node...")
         self.kill_node(self.on_kill_node_complete, self.on_progress)
-        
 
 class MimosaBuildOm(MimosaTextCommand):
     def run(self, edit):
@@ -229,3 +234,6 @@ class MimosaCleanF(MimosaTextCommand):
         self.kill_node_now()
         self.run_command(['mimosa', 'clean', '-f'])
 
+class MimosaKillNode(MimosaCommand, sublime_plugin.ApplicationCommand):
+    def run(self, edit):
+        self.kill_node_now()
