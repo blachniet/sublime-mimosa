@@ -221,7 +221,7 @@ class MimosaWatch(MimosaTextCommand):
 
     def run(self, edit):
         self.prep_scratch_output_view('Mimosa Watch')
-        self.kill_node(self.on_kill_node_complete, self.on_progress)
+        self.kill_node(self.on_kill_node_complete)
 
 class MimosaWatchS(MimosaWatch):
     def on_kill_node_complete(self, output):
@@ -232,7 +232,7 @@ class MimosaWatchS(MimosaWatch):
 
     def run(self, edit):
         self.prep_scratch_output_view('Mimosa Watch')
-        self.kill_node(self.on_kill_node_complete, self.on_progress)
+        self.kill_node(self.on_kill_node_complete)
 
 """ 
 Build
@@ -282,7 +282,7 @@ class MimosaClean(MimosaTextCommand):
 
     def run(self, edit):
         self.prep_scratch_output_view('Mimosa Clean')
-        self.kill_node(self.on_kill_node_complete, self.on_progress)
+        self.kill_node(self.on_kill_node_complete)
 
 class MimosaCleanF(MimosaClean):
     def on_kill_node_complete(self, output):
@@ -291,7 +291,7 @@ class MimosaCleanF(MimosaClean):
 
     def run(self, edit):
         self.prep_scratch_output_view('Mimosa Clean')
-        self.kill_node(self.on_kill_node_complete, self.on_progress)
+        self.kill_node(self.on_kill_node_complete)
 
 """ 
 Other
