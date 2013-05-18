@@ -7,11 +7,15 @@
     "command": "mimosa_watch_s"
 },
 {
-    "caption": "Mimosa::Build -mo",
+    "caption": "Mimosa::Build",
+    "command": "mimosa_build"
+},
+{
+    "caption": "Mimosa::Build -om",
     "command": "mimosa_build_om"
 },
 {
-    "caption": "Mimosa::Build -mop",
+    "caption": "Mimosa::Build -omp",
     "command": "mimosa_build_omp"
 },
 {
