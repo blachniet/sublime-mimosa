@@ -3,15 +3,15 @@
     "packages": [
         {
             "name": "Mimosa",
-            "description": "Because relaxing with a Mimosa is nothing less than Sublime",
+            "description": "A MimosaJS toolset for SublimeText",
             "author": "Brian Lachniet",
             "homepage": "https://github.com/blachniet/sublime-mimosa",
-            "last_modified": "2011-12-12 05:04:31",
+            "last_modified": "2013-05-18 05:04:31",
             "platforms": {
                 "*": [
                     {
                         "version": "0.1.0",
-                        "url": "https://github.com/blachniet/sublime-mimosa/zip/0.1.0"
+                        "url": "https://nodeload.github.com/blachniet/sublime-mimosa/zip/0.1.0"
                     }
                 ]
             }
