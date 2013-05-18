@@ -229,10 +229,10 @@ class MimosaWatch(MimosaTextCommand):
         self.append_line('  ' + output)
 
     def on_complete(self, output):
-        self.append_line("mimosa watch stopped")
+        self.append_line("Mimosa Watch Stopped")
+        self.print_final_output()
 
     def on_kill_node_complete(self, output):
-        self.append_line()
         self.append_line('Use Mimosa::KillNode to stop.')
         self.append_line("mimosa watch")
         self.run_command(['mimosa', 'watch'], on_complete=self.on_complete, on_progress=self.on_progress)
@@ -243,7 +243,6 @@ class MimosaWatch(MimosaTextCommand):
 
 class MimosaWatchS(MimosaWatch):
     def on_kill_node_complete(self, output):
-        self.append_line()
         self.append_line('Use Mimosa::KillNode to stop.')
         self.append_line("mimosa watch -s")
         self.run_command(['mimosa', 'watch', '-s'], on_complete=self.on_complete, on_progress=self.on_progress)
