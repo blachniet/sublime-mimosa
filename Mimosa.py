@@ -156,7 +156,7 @@ class MimosaCommand(sublime_plugin.TextCommand):
     def quick_panel(self, *args, **kwargs):
         self.get_window().show_quick_panel(*args, **kwargs)
 
-    def append_line(self, output=''):
+    def append_line(self, output='', scroll_to=True):
         """Appends a line of text to the current command's output view
         """
         v = self.output_view
@@ -165,6 +165,10 @@ class MimosaCommand(sublime_plugin.TextCommand):
         v.insert(edit, v.size(), output + '\n')
         v.end_edit(edit)
         v.set_read_only(True)
+        
+        end_point = v.size()
+        if scroll_to and v.visible_region().size() > 0 and not v.visible_region().contains(end_point):
+            v.show(end_point)
 
     def kill_node(self, on_complete=None, on_progress=None):
         self.append_line("Killing node...")
